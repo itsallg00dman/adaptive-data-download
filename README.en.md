@@ -4,7 +4,7 @@
 
 Benchmark, download, resume and verify public datasets from S3 and HTTP(S). The tool uses representative samples on the destination disk to select an engine and concurrency. It saves the manifest, selection, partial downloads and SHA-256 records with the task.
 
-Install [Node.js 22 or newer](https://nodejs.org/en/download) and [Git](https://git-scm.com/install). Run the following in a terminal:
+Install [Node.js 22 or newer](https://nodejs.org/en/download). Clone the repository with Git, or [download the ZIP](https://github.com/itsallg00dman/adaptive-data-download/archive/refs/heads/main.zip), extract it and run the `node` command in the extracted folder.
 
 ```sh
 git clone https://github.com/itsallg00dman/adaptive-data-download.git

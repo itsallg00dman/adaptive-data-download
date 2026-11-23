@@ -6,7 +6,8 @@ import { largeFile, listS3, loadHttp, MiB } from './sources.mjs';
 import { checkStage, diskSpace, ensureDir, existing, hashFile, stagePath, transfer } from './transfer.mjs';
 
 const sum = files => files.reduce((n, file) => n + file.size, 0);
-const sizeText = bytes => `${(bytes / MiB).toFixed(1)} MiB`;
+const sizeText = bytes => bytes < 1024 ? `${bytes} B` : bytes < MiB ?
+  `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / MiB).toFixed(1)} MiB`;
 const rangeSafe = file => !!(file.etag || file.sha256 || file.md5);
 const groupOf = file => file.size >= largeFile ? 'large' : 'small';
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'));
@@ -91,19 +92,21 @@ async function inspect(root, plan, state, signal, verify) {
   return { pending, problems };
 }
 
-function candidates(files, group, { source, tools, options }) {
+function candidates(files, sample, group, { source, tools, options }) {
   const configs = [];
-  if (source.type === 's3' && tools.aws) {
-    for (const jobs of options.concurrency) configs.push({ engine: 'aws', jobs });
-  }
-  if (tools.aria2 && files.every(rangeSafe)) {
-    for (const width of options.concurrency) {
-      configs.push(group === 'large' ? { engine: 'aria2', jobs: Math.min(2, files.length), parts: Math.min(16, Math.max(1, Math.floor(width / 2))) } :
-        { engine: 'aria2', jobs: width, parts: 1 });
+  const awsRequests = sample.reduce((count, file) => count + (file.size < 64 * MiB ? 1 : Math.ceil(file.size / (16 * MiB))), 0);
+  const canUseAria = tools.aria2 && files.every(rangeSafe);
+  for (const width of options.concurrency) {
+    const jobs = Math.min(width, sample.length);
+    if (source.type === 's3' && tools.aws) configs.push({ engine: 'aws', jobs: Math.min(width, awsRequests) });
+    if (canUseAria) {
+      configs.push(group === 'large' ?
+        { engine: 'aria2', jobs: Math.min(2, sample.length), parts: Math.min(16, Math.max(1, Math.floor(width / 2))) } :
+        { engine: 'aria2', jobs, parts: 1 });
     }
+    configs.push({ engine: 'http', jobs });
   }
-  for (const jobs of options.concurrency) configs.push({ engine: 'http', jobs });
-  return configs;
+  return [...new Map(configs.map(config => [JSON.stringify(config), config])).values()];
 }
 
 function defaultConfig(files, group, { source, tools, options }) {
@@ -131,21 +134,18 @@ const pressure = config => config.jobs * (config.parts ?? 1);
 async function tune(files, group, work, context) {
   const { options, signal } = context;
   const sample = representative(files, options.benchMiB * MiB);
-  const variants = candidates(files, group, context);
+  const variants = sample.length ? candidates(files, sample, group, context) : [];
   const baseline = defaultConfig(files, group, context);
   if (options.skipBenchmark || !sample.length || variants.length === 1) {
     const reason = options.skipBenchmark ? 'disabled' : !sample.length ? 'no complete sample within budget' : 'one configuration';
-    return { selected: baseline, reason, trials: [] };
+    return { selected: options.skipBenchmark || !sample.length ? baseline : variants[0], reason, trials: [] };
   }
   if (await diskSpace(work) < BigInt(sum(sample))) throw new Error('Insufficient free space for the benchmark sample');
   const trials = [];
   const benchRoot = await ensureDir(work, `bench-${randomUUID()}`);
   try {
     console.log(`Benchmark ${group}: ${sample.length} files, ${sizeText(sum(sample))} per attempt`);
-    // Try a low and a medium request count per tool before higher concurrency.
-    const engines = [...new Set(variants.map(item => item.engine))];
-    const ordered = options.concurrency.flatMap((_, index) => engines.map(engine => variants.filter(item => item.engine === engine)[index]));
-    for (const config of ordered) {
+    for (const config of variants) {
       signal.throwIfAborted();
       const trialDir = await ensureDir(benchRoot, randomUUID());
       const trialSignal = AbortSignal.any([signal, AbortSignal.timeout(options.benchSeconds * 1000)]);

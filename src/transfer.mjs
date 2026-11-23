@@ -143,7 +143,7 @@ function sharedParent(files) {
 async function awsBatch(files, source, config, root, executable, signal) {
   const directory = await ensureDir(root, 'aws');
   const configFile = join(root, 'aws-config');
-  await writeFile(configFile, `[default]\nregion = ${source.region}\nretry_mode = standard\nmax_attempts = 4\ns3 =\n    preferred_transfer_client = classic\n    max_concurrent_requests = ${config.jobs}\n`, 'utf8');
+  await writeFile(configFile, `[default]\nregion = ${source.region}\nretry_mode = standard\nmax_attempts = 4\ns3 =\n    preferred_transfer_client = classic\n    max_concurrent_requests = ${config.jobs}\n    multipart_threshold = 64MB\n    multipart_chunksize = 16MB\n`, 'utf8');
   const env = { ...process.env, AWS_CONFIG_FILE: configFile, AWS_PROFILE: 'default', AWS_PAGER: '',
     AWS_RETRY_MODE: 'standard', AWS_MAX_ATTEMPTS: '4' };
   const options = ['--no-sign-request', '--no-progress', '--region', source.region,

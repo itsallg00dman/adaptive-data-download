@@ -6,7 +6,7 @@
 
 ## 快速开始
 
-安装 [Node.js 22 或更新版本](https://nodejs.org/en/download)和 [Git](https://git-scm.com/install)，然后在终端执行：
+安装 [Node.js 22 或更新版本](https://nodejs.org/en/download)。如果已安装 Git，可用以下命令获取代码。也可以[下载 ZIP](https://github.com/itsallg00dman/adaptive-data-download/archive/refs/heads/main.zip)，解压后在该目录运行 `node` 命令。
 
 ```sh
 git clone https://github.com/itsallg00dman/adaptive-data-download.git

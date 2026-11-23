@@ -48,8 +48,12 @@ function invoke(output, command, args = [], env = { ...process.env, PATH: '' }) 
 }
 
 test('benchmarks downloads, preserves verified output on restart, and detects same-size corruption', async t => {
-  const { output, requests, contents, url } = await fixture(t);
-  const result = await invoke(output, 'run', ['--source', url, '--concurrency', '1,2']);
+  const { root, output, requests, contents, url } = await fixture(t);
+  const manifest = join(root, 'sample.json');
+  await writeFile(manifest, JSON.stringify(['payload.bin', 'second.bin'].map(path => ({
+    path, url, size: contents.length, sha256: sha(contents),
+  }))));
+  const result = await invoke(output, 'run', ['--manifest', manifest, '--concurrency', '1,2']);
   assert.match(result.stdout, /Benchmark small/u);
   assert.match(result.stdout, /Download complete/u);
   const dest = join(output, 'payload.bin');
@@ -62,6 +66,14 @@ test('benchmarks downloads, preserves verified output on restart, and detects sa
   await invoke(output, 'verify');
   await writeFile(dest, Buffer.alloc(contents.length));
   await assert.rejects(invoke(output, 'verify'), /Checksum mismatch/u);
+});
+
+test('downloads a single direct link without testing equivalent concurrency settings', async t => {
+  const { output, requests, contents, url } = await fixture(t);
+  const result = await invoke(output, 'run', ['--source', url]);
+  assert.match(result.stdout, /http 1 \(one configuration\)/u);
+  assert.deepEqual(requests, ['full']);
+  assert.deepEqual(await readFile(join(output, 'payload.bin')), contents);
 });
 
 test('continues a saved HTTP partial using an If-Match protected Range request', async t => {
