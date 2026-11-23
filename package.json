@@ -1,0 +1,11 @@
+{
+  "name": "adaptive-data-download",
+  "version": "0.1.0",
+  "description": "Benchmark, resume and verify public S3 and HTTP data downloads",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "bin": { "adaptive-download": "./bin/download.mjs" },
+  "scripts": { "test": "node --test" }
+}

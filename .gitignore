@@ -1,0 +1,5 @@
+node_modules/
+.adaptive-download/
+*.aria2
+*.part
+*.log
